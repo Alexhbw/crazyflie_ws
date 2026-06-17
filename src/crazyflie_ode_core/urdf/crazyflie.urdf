@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot name="crazyflie2">
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/alex/crazyflie_ws/src/crazyflie_ode_core/meshes/crazyflie2.dae"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

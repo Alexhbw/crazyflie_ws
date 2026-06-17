@@ -1,0 +1,15 @@
+build/
+install/
+log/
+*.pyc
+__pycache__/
+*.log
+plots/
+compare_results/
+experiment_results/
+safety_boundary_results/
+safety_log.csv
+experiment_metrics.csv
+*.csv
+.vscode/
+.claude/
