@@ -18,8 +18,15 @@ find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(ament_index_cpp REQUIRED)
-add_executable(ode_engine_node src/ode_engine_node.cpp)
-target_include_directories(ode_engine_node PRIVATE ${EIGEN3_INCLUDE_DIRS})
+add_executable(ode_engine_node
+  src/ode_engine_node.cpp
+  src/safety_monitor.cpp
+  src/interval_reachability.cpp
+)
+target_include_directories(ode_engine_node PRIVATE
+  ${EIGEN3_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 target_link_libraries(ode_engine_node yaml-cpp)
 ament_target_dependencies(ode_engine_node rclcpp std_msgs sensor_msgs geometry_msgs rosgraph_msgs nav_msgs tf2_ros visualization_msgs ament_index_cpp)
 
@@ -46,3 +53,9 @@ install(DIRECTORY urdf launch rviz meshes config
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/run_experiments.py
+  scripts/safety_boundary_analysis.py
+  scripts/plot_results.py
+  DESTINATION lib/${PROJECT_NAME}
+)
