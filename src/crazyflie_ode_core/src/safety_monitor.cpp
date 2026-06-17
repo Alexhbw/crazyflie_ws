@@ -1,5 +1,4 @@
 #include "crazyflie_ode_core/safety_monitor.hpp"
-#include "crazyflie_ode_core/solver_registry.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
@@ -285,60 +284,4 @@ double SafetyMonitor::computeEnergy(const Vector12d& state, double mass, double 
     double ke_rot = 0.5 * omega.dot(I_matrix * omega);
     double pe = mass * g * z;
     return ke_trans + ke_rot + pe;
-}
-
-// ================================================================
-// SafetyController 实现
-// ================================================================
-
-SafetyController::SafetyController(int window_size, double dt_min,
-                                   double dt_factor,
-                                   double thresh_halve,
-                                   double thresh_switch,
-                                   double thresh_stop)
-    : window_size_(window_size), dt_min_(dt_min), dt_factor_(dt_factor),
-      thresh_halve_(thresh_halve), thresh_switch_(thresh_switch),
-      thresh_stop_(thresh_stop), action_count_(0)
-{}
-
-SafetyAction SafetyController::evaluate(double overall_score) {
-    // 指数平滑 (低通滤波，防止单步误触发)
-    smoothed_score_ = alpha_ * overall_score + (1.0 - alpha_) * smoothed_score_;
-    scores_.push_back(overall_score);
-    if (static_cast<int>(scores_.size()) > window_size_) {
-        scores_.erase(scores_.begin());
-    }
-
-    double score = smoothed_score_;
-
-    if (score < thresh_stop_) {
-        action_count_++;
-        return SafetyAction::EMERGENCY_STOP;
-    }
-    if (score < thresh_switch_) {
-        action_count_++;
-        return SafetyAction::SWITCH_SOLVER;
-    }
-    if (score < thresh_halve_) {
-        action_count_++;
-        return SafetyAction::REDUCE_DT;
-    }
-    return SafetyAction::NONE;
-}
-
-double SafetyController::reducedStep(double current_dt) const {
-    double new_dt = current_dt * dt_factor_;
-    return (new_dt < dt_min_) ? dt_min_ : new_dt;
-}
-
-SolverType SafetyController::saferSolver(SolverType current) const {
-    // 求解器安全层级: euler < heun < rk4 < rk45 < implicit
-    switch (current) {
-        case SolverType::EULER:    return SolverType::HEUN;
-        case SolverType::HEUN:     return SolverType::RK4;
-        case SolverType::RK4:      return SolverType::RK45;
-        case SolverType::RK45:     return SolverType::IMPLICIT;
-        case SolverType::IMPLICIT: return SolverType::IMPLICIT; // already safest
-    }
-    return SolverType::IMPLICIT; // fallback to safest
 }

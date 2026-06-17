@@ -7,9 +7,6 @@
 #include <vector>
 #include <fstream>
 
-// 前向声明 SolverType (用于 SafetyController)
-enum class SolverType : int;
-
 // 前向声明
 struct CylinderObstacle;
 
@@ -155,56 +152,6 @@ private:
 
     double computeEnergy(const Vector12d& state, double mass, double g,
                          const Eigen::Matrix3d& I_matrix) const;
-};
-
-// ---- 在线安全控制器 ----
-// 根据安全监视器输出的分数，自动触发递进式保护动作
-// 三级递进: REDUCE_DT (减半步长) → SWITCH_SOLVER (切换更保守求解器) → EMERGENCY_STOP (关机)
-
-enum class SafetyAction { NONE, REDUCE_DT, SWITCH_SOLVER, EMERGENCY_STOP };
-
-inline const char* safetyActionName(SafetyAction a) {
-    switch (a) {
-        case SafetyAction::NONE:           return "NONE";
-        case SafetyAction::REDUCE_DT:      return "REDUCE_DT";
-        case SafetyAction::SWITCH_SOLVER:  return "SWITCH_SOLVER";
-        case SafetyAction::EMERGENCY_STOP: return "EMERGENCY_STOP";
-    }
-    return "UNKNOWN";
-}
-
-class SafetyController {
-public:
-    SafetyController(int window_size = 100, double dt_min = 0.0001,
-                     double dt_factor = 0.5,
-                     double thresh_halve = 0.7,
-                     double thresh_switch = 0.3,
-                     double thresh_stop = 0.05);
-
-    // 每步喂入安全分数，返回是否需要采取行动
-    SafetyAction evaluate(double overall_score);
-
-    // 计算新的步长 (减半)
-    double reducedStep(double current_dt) const;
-
-    // 计算下一个更安全的求解器
-    SolverType saferSolver(SolverType current) const;
-
-    // 获取当前状态
-    int actionCount() const { return action_count_; }
-    void resetActions() { action_count_ = 0; scores_.clear(); }
-
-private:
-    int window_size_;
-    double dt_min_;
-    double dt_factor_;
-    double thresh_halve_;
-    double thresh_switch_;
-    double thresh_stop_;
-    int action_count_;
-    std::vector<double> scores_;       // 滑动窗口内的综合分数
-    double smoothed_score_ = 1.0;      // 指数平滑分数
-    double alpha_ = 0.05;              // 平滑系数 (慢速响应噪声)
 };
 
 #endif  // CRAZYFLIE_ODE_CORE__SAFETY_MONITOR_HPP_

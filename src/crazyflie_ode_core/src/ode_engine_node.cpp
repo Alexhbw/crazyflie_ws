@@ -66,30 +66,7 @@ public:
         this->declare_parameter<bool>("safety.verbose", false);
         this->declare_parameter<double>("safety.warmup_time", 2.0);
 
-        // --- 4. 在线安全控制器参数 ---
-        this->declare_parameter<bool>("safety_controller.enabled", false);
-        this->declare_parameter<int>("safety_controller.window_size", 100);
-        this->declare_parameter<double>("safety_controller.threshold_halve", 0.7);
-        this->declare_parameter<double>("safety_controller.threshold_switch", 0.3);
-        this->declare_parameter<double>("safety_controller.threshold_stop", 0.05);
-
-        bool sc_enabled;
-        this->get_parameter("safety_controller.enabled", sc_enabled);
-        if (sc_enabled) {
-            int sc_win; double sc_h, sc_s, sc_st;
-            this->get_parameter("safety_controller.window_size", sc_win);
-            this->get_parameter("safety_controller.threshold_halve", sc_h);
-            this->get_parameter("safety_controller.threshold_switch", sc_s);
-            this->get_parameter("safety_controller.threshold_stop", sc_st);
-            safety_controller_ = std::make_unique<SafetyController>(
-                sc_win, 0.0001, 0.5, sc_h, sc_s, sc_st);
-            RCLCPP_INFO(this->get_logger(),
-                "Online Safety Controller ENABLED | "
-                "window=%d thresholds: halve=%.2f switch=%.2f stop=%.2f",
-                sc_win, sc_h, sc_s, sc_st);
-        }
-
-        // --- 5. 实验模式参数 ---
+        // --- 4. 实验模式参数 ---
         this->declare_parameter<bool>("experiment.enabled", false);
         this->declare_parameter<double>("experiment.duration", 30.0);
         this->declare_parameter<std::string>("experiment.metrics_path", "experiment_metrics.csv");
@@ -260,49 +237,6 @@ private:
     // --- 区间可达集 ---
     bool reachability_enabled_ = false;
     std::unique_ptr<IntervalReachability> reachability_;
-
-    // --- 在线安全控制器 ---
-    std::unique_ptr<SafetyController> safety_controller_;
-
-    void applySafetyAction(SafetyAction action) {
-        if (action == SafetyAction::NONE) return;
-        auto scores = safety_monitor_->getScores();
-        RCLCPP_WARN(this->get_logger(),
-            "SAFETY ACTION: %s | overall=%.3f | trigger-count=%d",
-            safetyActionName(action), scores.overall_score(),
-            safety_controller_->actionCount());
-        switch (action) {
-            case SafetyAction::REDUCE_DT: {
-                double ndt = safety_controller_->reducedStep(h_step_);
-                if (ndt < h_step_ * 0.9) {
-                    h_step_ = ndt;
-                    timer_->cancel();
-                    timer_ = this->create_wall_timer(
-                        std::chrono::duration<double>(h_step_),
-                        std::bind(&OdeEngineNode::physicsStepLoop, this));
-                    RCLCPP_WARN(this->get_logger(), "  -> Step halved to dt=%.6f", h_step_);
-                }
-                break;
-            }
-            case SafetyAction::SWITCH_SOLVER: {
-                SolverType ns = safety_controller_->saferSolver(solver_type_enum_);
-                if (ns != solver_type_enum_) {
-                    RCLCPP_WARN(this->get_logger(), "  -> Solver: %s -> %s",
-                                solverTypeToString(solver_type_enum_).c_str(),
-                                solverTypeToString(ns).c_str());
-                    solver_type_enum_ = ns;
-                    buildSolverDispatch();
-                }
-                break;
-            }
-            case SafetyAction::EMERGENCY_STOP:
-                RCLCPP_ERROR(this->get_logger(), "  -> EMERGENCY STOP");
-                safety_monitor_->writeCSV();
-                rclcpp::shutdown();
-                break;
-            default: break;
-        }
-    }
 
     // --- 加载障碍物 YAML 配置 ---
     void loadObstaclesFromYAML() {
@@ -684,15 +618,6 @@ private:
         // ---- 安全监视器评估 ----
         safety_monitor_->evaluateStep(t_sec, states_, target_poses_, obstacles_,
                                       mass_, g_, I_matrix_);
-
-        // ---- 在线安全控制器 (每 5 步检查一次) ----
-        if (safety_controller_ && step_count_ % 5 == 0) {
-            auto scores = safety_monitor_->getScores();
-            SafetyAction action = safety_controller_->evaluate(scores.overall_score());
-            if (action != SafetyAction::NONE) {
-                applySafetyAction(action);
-            }
-        }
 
         // ---- 实验模式: 到达指定时长自动关机 ----
         if (experiment_enabled_ && t_sec >= experiment_duration_) {
