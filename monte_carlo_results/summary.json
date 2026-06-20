@@ -1,0 +1,14 @@
+{
+  "solver": "rk4",
+  "dt": 0.01,
+  "num_drones": 4,
+  "epsilon": 0.05,
+  "n_samples": 200,
+  "valid": 200,
+  "obstacle_dist_min": 0.137874,
+  "obstacle_dist_max": 1.160937,
+  "obstacle_dist_mean": 0.50714535,
+  "velocity_min": 1.324201,
+  "velocity_max": 4.455874,
+  "velocity_mean": 2.1323731099999996
+}

@@ -54,6 +54,7 @@ install(DIRECTORY urdf launch rviz meshes config
 )
 
 install(PROGRAMS
+  scripts/counterexample_mining.py
   scripts/run_experiments.py
   scripts/safety_boundary_analysis.py
   scripts/plot_results.py
